@@ -29,6 +29,9 @@ cp .env.example .env   # fill in DISCORD_TOKEN, ALERT_WEBHOOK_TOKEN, ids
 node src/index.js
 ```
 
+Design write-up (how and why it is built this way):
+`docs/how-we-built-it.md`.
+
 Systemd user unit: `jarvis-voice.service`
 (`WorkingDirectory` = this tree, `EnvironmentFile` = `.env`).
 
