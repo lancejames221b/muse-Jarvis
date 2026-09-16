@@ -5,6 +5,7 @@
  */
 import { Client, GatewayIntentBits } from 'discord.js';
 import logger from './logger.js';
+import { pushTextItem } from './voice/outbox.js';
 
 export function createDiscord({ config }) {
   const client = new Client({
@@ -18,8 +19,59 @@ export function createDiscord({ config }) {
   // Voice-only in threads: stay silent (ported from the old bot).
   client.on('messageCreate', (message) => {
     if (message.channel?.isThread?.()) return;
-    // Typed messages are not handled — voice only.
+    handleTextInput(message).catch((err) => logger.warn(`discord: text input failed: ${err.message}`));
   });
+
+  /**
+   * Typed input from the owner. Accepted in: bot DMs, the main text channel
+   * (#general), and the owner's live voice channel chat. Elsewhere — silent.
+   * Addressed when it @-mentions the bot or leads with "jarvis"
+   * (DMs are always addressed). Queued as { via: 'text', channelId }.
+   */
+  async function handleTextInput(message) {
+    if (!message || message.author?.bot) return;
+    if (!config.allowedUsers.includes(message.author.id)) return;
+    const channel = message.channel;
+    if (!channel) return;
+    const isDM = !channel.guildId;
+    let accepted = isDM;
+    if (!accepted && config.textChannelId && channel.id === config.textChannelId) accepted = true;
+    if (!accepted) {
+      const guild = client.guilds.cache.get(config.guildId);
+      const member = guild?.members.cache.get(config.allowedUsers[0]);
+      if (member?.voice?.channelId && channel.id === member.voice.channelId) accepted = true;
+    }
+    if (!accepted) return;
+    const botId = client.user?.id;
+    let text = message.content || '';
+    let addressed = isDM;
+    if (!addressed && botId) {
+      const mentionRe = new RegExp(`<@!?${botId}>`);
+      if (mentionRe.test(text)) {
+        addressed = true;
+        text = text.replace(mentionRe, ' ');
+      }
+    }
+    if (!addressed && /^\s*(hey\s+)?jarvis[\s,.:;!?]+/i.test(text)) {
+      addressed = true;
+      text = text.replace(/^\s*(hey\s+)?jarvis[\s,.:;!?]+/i, '');
+    }
+    if (!addressed || !text.trim()) return;
+    const item = pushTextItem(text.trim(), channel.id);
+    if (item) logger.info(`discord: text input queued #${item.id} from #${channel.name || 'DM'}`);
+  }
+
+  /** Post a text reply to a specific channel (the /send-text path). */
+  async function sendTextToChannel(channelId, text) {
+    const body = String(text || '').substring(0, 2000);
+    if (!body.trim()) return false;
+    const ch = client.channels.cache.get(channelId)
+      || await client.channels.fetch(channelId).catch(() => null);
+    if (!ch?.isTextBased?.()) return false;
+    await ch.send(body);
+    logger.info(`discord: text reply sent to #${ch.name || channelId}`);
+    return true;
+  }
 
   async function login() {
     await client.login(config.discordToken);
@@ -99,5 +151,5 @@ export function createDiscord({ config }) {
     postTextFallback(text).catch(() => {});
   }
 
-  return { client, login, postTextFallback, setOwnerServerMute, notify };
+  return { client, login, postTextFallback, setOwnerServerMute, notify, sendTextToChannel };
 }

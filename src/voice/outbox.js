@@ -10,8 +10,8 @@
  * subsequent in-window utterances are pushed WITHOUT the wake word and carry
  * { followUp: true } so the Muse-side listener can tell them apart.
  * The [VOICE] prompt tag is a separate downstream flag and is NOT the trigger.
- * Typed messages, alerts, and other agents' traffic never reach this module:
- * there is no negative tag to filter against.
+ * Typed owner messages reach this module via pushTextItem() with
+ * { via: 'text', channelId } — same outbox, same pipeline, answered in text.
  *
  * In-memory ring buffer (last 50), monotonic ids. Served by the alert-webhook
  * HTTP server at GET /voice-inbox?since=<id> (same Bearer auth as /speak).
@@ -90,6 +90,8 @@ export function pushVoiceItem(text, opts = {}) {
   _lastPush = { text: t, at: now };
   const item = { id: _nextId++, ts: new Date(now).toISOString(), text: t };
   if (opts.followUp) item.followUp = true;
+  if (opts.via) item.via = opts.via;
+  if (opts.channelId) item.channelId = opts.channelId;
   saveNextId(_nextId);
   _items.push(item);
   while (_items.length > MAX_ITEMS) _items.shift();
@@ -108,6 +110,15 @@ export function pushTestItem(text) {
   const item = pushVoiceItem('[TEST] ' + String(text || '').trim());
   if (item) item.test = true;
   return item;
+}
+
+/**
+ * Typed input from the owner (Discord text). Same outbox, same pipeline —
+ * the item carries { via: 'text', channelId } so the Muse side answers
+ * in text, never voice. Text in, text out.
+ */
+export function pushTextItem(text, channelId) {
+  return pushVoiceItem(String(text || '').trim(), { via: 'text', channelId });
 }
 
 export function inboxSize() {

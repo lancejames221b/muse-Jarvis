@@ -142,6 +142,26 @@ export function createHttp({ config, player, voiceConn, discord, stt, tts, route
     return json(res, 200, { ok: true, delivered: 'text-fallback', userInVoice });
   }
 
+  async function handleSendText(req, res) {
+    let body;
+    try {
+      body = await readBody(req);
+    } catch {
+      return json(res, 400, { error: 'invalid JSON' });
+    }
+    const message = body.message;
+    const channelId = body.channelId;
+    if (!message || !String(message).trim()) {
+      return json(res, 400, { error: 'message required' });
+    }
+    if (!channelId || !String(channelId).trim()) {
+      return json(res, 400, { error: 'channelId required' });
+    }
+    const ok = await discord.sendTextToChannel(String(channelId).trim(), String(message));
+    if (!ok) return json(res, 502, { error: 'send failed' });
+    return json(res, 200, { ok: true, delivered: 'text', channelId: String(channelId).trim() });
+  }
+
   function handleHealth(_req, res) {
     const conn = voiceConn.getConnection();
     json(res, 200, {
@@ -168,6 +188,7 @@ export function createHttp({ config, player, voiceConn, discord, stt, tts, route
         return json(res, 200, { ok: true, item: pushTestItem(text) });
       }
       if (req.method === 'POST' && url.pathname === '/speak') return handleSpeak(req, res);
+      if (req.method === 'POST' && url.pathname === '/send-text') return handleSendText(req, res);
       return json(res, 404, { error: 'not found' });
     } catch (err) {
       logger.error(`http: handler error: ${err.message}`);
