@@ -30,11 +30,32 @@ export function createDiscord({ config }) {
     logger.info(`discord: logged in as ${client.user.tag}`);
   }
 
-  /** Text fallback for /speak when the owner isn't in voice (or TTS failed). */
+  /**
+   * Text fallback for /speak when the owner isn't in voice (or TTS failed).
+   * Tracks the owner: his live voice channel's text chat first, then the
+   * configured main channel (#general), then owner DM as last resort.
+   */
   async function postTextFallback(text) {
     const body = String(text || '').substring(0, 2000);
     if (!body.trim()) return false;
-    // 1. Configured text channel, when it's a real snowflake.
+    // 0. Owner's live voice channel text chat — follows him as he moves.
+    try {
+      const guild = client.guilds.cache.get(config.guildId);
+      let member = guild?.members.cache.get(config.allowedUsers[0]);
+      if (!member && guild) member = await guild.members.fetch(config.allowedUsers[0]).catch(() => null);
+      const vcId = member?.voice?.channelId;
+      const vc = vcId
+        ? (client.channels.cache.get(vcId) || await client.channels.fetch(vcId).catch(() => null))
+        : null;
+      if (vc?.isTextBased?.()) {
+        await vc.send(body);
+        logger.info(`discord: text fallback posted to voice-channel chat #${vc.name}`);
+        return true;
+      }
+    } catch (err) {
+      logger.warn(`discord: voice-channel text post failed: ${err.message}`);
+    }
+    // 1. Configured main text channel (#general), when it's a real snowflake.
     if (config.textChannelId) {
       try {
         const ch = client.channels.cache.get(config.textChannelId)
