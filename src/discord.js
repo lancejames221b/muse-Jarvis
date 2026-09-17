@@ -27,15 +27,23 @@ export function createDiscord({ config }) {
     handleTextInput(message).catch((err) => logger.warn(`discord: text input failed: ${err.message}`));
   });
 
+  // Threads MUSE opened after an @muse summon: threadId -> parentChannelId.
+  // Messages inside them are implicitly addressed, so the conversation flows
+  // without a mention on every line.
+  const botThreads = new Map();
+
   /**
    * Typed input from allowed users. Accepted in every text channel the bot
    * can see — DMs, guild channels, and threads, except channels listed in
-   * MUSE_SILENT_CHANNELS. Addressing: DMs and the
-   * owner's live voice-channel chat are implicitly addressed; everywhere
-   * else the message must @-mention the bot or lead with "jarvis" (shared
-   * space). Queued as { via: 'text', channelId } so the reply lands in the
-   * exact originating channel or thread. Gated by TEXT_ENABLED and the
-   * allowed-user list. Text in, text out — never voice.
+   * MUSE_SILENT_CHANNELS (an explicit @muse summon still opens a thread
+   * there). Addressing: DMs, the owner's live voice-channel chat, and
+   * MUSE's own summon threads are implicitly addressed; everywhere else the
+   * message must @-mention the bot or lead with "jarvis" (shared space).
+   * An @muse mention in a guild channel opens (or reuses) a thread and the
+   * reply lands there, keeping the channel itself clean. Queued as
+   * { via: 'text', channelId } so the reply lands in the exact originating
+   * channel or thread. Gated by TEXT_ENABLED and the allowed-user list.
+   * Text in, text out — never voice.
    */
   async function handleTextInput(message) {
     if (!config.textEnabled) return;
@@ -43,9 +51,15 @@ export function createDiscord({ config }) {
     if (!config.allowedUsers.includes(message.author.id)) return;
     const channel = message.channel;
     if (!channel) return;
-    // Per-channel silence list: MUSE never answers typed input here.
-    if (config.silentTextChannels.includes(channel.id)) return;
+    const botId = client.user?.id;
+    let text = message.content || '';
+    const mentionRe = botId ? new RegExp(`<@!?${botId}>`) : null;
+    const mentioned = !!(mentionRe && mentionRe.test(text));
+    // Per-channel silence list: MUSE never answers typed input here —
+    // unless explicitly summoned with @muse, which opens a thread instead.
+    if (!mentioned && config.silentTextChannels.includes(channel.id)) return;
     const isDM = !channel.guildId;
+    const inBotThread = channel.isThread?.() && botThreads.has(channel.id);
     // The owner's live voice-channel chat is implicitly addressed — it
     // follows him as he moves channels.
     let isVoiceChat = false;
@@ -56,23 +70,69 @@ export function createDiscord({ config }) {
         isVoiceChat = true;
       }
     }
-    const botId = client.user?.id;
-    let text = message.content || '';
-    let addressed = isDM || isVoiceChat;
-    if (!addressed && botId) {
-      const mentionRe = new RegExp(`<@!?${botId}>`);
-      if (mentionRe.test(text)) {
-        addressed = true;
-        text = text.replace(mentionRe, ' ');
-      }
+    let addressed = isDM || isVoiceChat || inBotThread;
+    if (mentionRe && mentionRe.test(text)) {
+      addressed = true;
+      text = text.replace(mentionRe, ' ');
     }
     if (!addressed && /^\s*(hey\s+)?jarvis[\s,.:;!?]+/i.test(text)) {
       addressed = true;
       text = text.replace(/^\s*(hey\s+)?jarvis[\s,.:;!?]+/i, '');
     }
     if (!addressed || !text.trim()) return;
-    const item = pushTextItem(text.trim(), channel.id);
-    if (item) logger.info(`discord: text input queued #${item.id} from #${channel.name || 'DM'}`);
+
+    // Explicit @muse summon in a guild channel: converse in a thread so the
+    // channel itself stays clean. Reuse MUSE's live thread for the parent
+    // channel when there is one; otherwise open a new one.
+    let replyChannelId = channel.id;
+    if (mentioned && !isDM && !channel.isThread?.()) {
+      const thread = await getOrOpenSummonThread(message).catch((err) => {
+        logger.warn(`discord: summon thread failed: ${err.message}`);
+        return null;
+      });
+      if (thread) {
+        replyChannelId = thread.id;
+      } else if (config.silentTextChannels.includes(channel.id)) {
+        return; // silent channel: no thread, no reply — stay silent.
+      }
+    }
+    const item = pushTextItem(text.trim(), replyChannelId);
+    if (item) logger.info(`discord: text input queued #${item.id} from #${channel.name || 'DM'}${replyChannelId !== channel.id ? ' (thread)' : ''}`);
+  }
+
+  /**
+   * Thread MUSE chats in after an @muse summon. One live thread per parent
+   * channel: reuse the tracked one (unarchiving if needed), else adopt an
+   * existing live "MUSE chat" thread the bot owns, else open a new one.
+   */
+  async function getOrOpenSummonThread(message) {
+    const parentId = message.channel.id;
+    const clean = (message.content || '').replace(/<@!?\d+>/g, '').trim().slice(0, 40);
+    const threadName = `MUSE chat${clean ? ' — ' + clean : ''}`.slice(0, 100);
+
+    const useThread = async (t) => {
+      if (t?.archived) await t.setArchived(false).catch(() => null);
+      botThreads.set(t.id, parentId);
+      return t;
+    };
+
+    const existingId = [...botThreads.entries()].find(([, p]) => p === parentId)?.[0];
+    if (existingId) {
+      const t = client.channels.cache.get(existingId)
+        || await client.channels.fetch(existingId).catch(() => null);
+      if (t?.isThread?.()) return useThread(t);
+      botThreads.delete(existingId);
+    }
+    if (message.thread) return useThread(message.thread);
+    try {
+      const active = await message.channel.threads.fetchActive().catch(() => null);
+      const owned = active?.threads?.find((t) => t.ownerId === client.user.id && t.name.startsWith('MUSE chat'));
+      if (owned) return useThread(owned);
+    } catch { /* fall through to creating */ }
+    const thread = await message.startThread({ name: threadName, autoArchiveDuration: 1440 });
+    botThreads.set(thread.id, parentId);
+    logger.info(`discord: summon thread opened "${thread.name}" (${thread.id})`);
+    return thread;
   }
 
   /** Post a text reply to a specific channel (the /send-text path). */
