@@ -92,6 +92,7 @@ export function pushVoiceItem(text, opts = {}) {
   if (opts.followUp) item.followUp = true;
   if (opts.via) item.via = opts.via;
   if (opts.channelId) item.channelId = opts.channelId;
+  if (opts.voiceChannelId) item.voiceChannelId = opts.voiceChannelId;
   saveNextId(_nextId);
   _items.push(item);
   while (_items.length > MAX_ITEMS) _items.shift();

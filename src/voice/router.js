@@ -21,7 +21,13 @@ import logger from '../logger.js';
 
 const WAKE_RE = /^(hey[^a-z0-9]*)?jarvis\b[^a-z0-9]*/i;
 
-export function createRouter({ outbox, player, allowedUsers, conversationModeEnabled, onHeard }) {
+export function createRouter({ outbox, player, allowedUsers, conversationModeEnabled, onHeard, getVoiceChannelId }) {
+  // Voice-channel chat id for 'send it to the chat' requests: resolved lazily
+  // at push time so reconnects and channel moves are picked up.
+  const voiceChannelOpts = () => {
+    const vch = getVoiceChannelId?.() || null;
+    return vch ? { voiceChannelId: vch } : {};
+  };
   function route(userId, text) {
     if (!allowedUsers.includes(userId)) return;
     const t = String(text || '').trim();
@@ -43,7 +49,7 @@ export function createRouter({ outbox, player, allowedUsers, conversationModeEna
       }
       if (conversationModeEnabled) openMuseConversationWindow(userId);
       if (cmd) {
-        const item = outbox.pushVoiceItem(cmd);
+        const item = outbox.pushVoiceItem(cmd, voiceChannelOpts());
         if (item) {
           logger.info(`router: inbox #${item.id} "${cmd.substring(0, 60)}"`);
           try { onHeard?.(cmd, 'command'); } catch {}
@@ -67,7 +73,7 @@ export function createRouter({ outbox, player, allowedUsers, conversationModeEna
         logger.info(`router: in-window non-speech ignored "${t.substring(0, 40)}"`);
         return;
       }
-      const item = outbox.pushVoiceItem(t, { followUp: true });
+      const item = outbox.pushVoiceItem(t, { followUp: true, ...voiceChannelOpts() });
       if (item) {
         logger.info(`router: inbox #${item.id} (follow-up) "${t.substring(0, 60)}"`);
         openMuseConversationWindow(userId); // refresh on each follow-up

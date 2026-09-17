@@ -48,6 +48,7 @@ const router = createRouter({
   allowedUsers: config.allowedUsers,
   conversationModeEnabled: config.conversationModeEnabled,
   onHeard: (text, kind) => { postTranscriptFeed(text, kind); },
+  getVoiceChannelId: () => voiceConn?.getChannelId?.() || null,
 });
 
 /**
