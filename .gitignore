@@ -3,4 +3,4 @@ node_modules/
 src/.voice-inbox-nextid
 *.log
 data/
-\nsrc/.voice-inbox-outbox.jsonl\n
+src/.voice-inbox-outbox.jsonl
