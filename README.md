@@ -35,6 +35,12 @@ Design write-up (the Dead Zeppelin post — personal agentic AI, Tailscale secur
 Systemd user unit: `jarvis-voice.service`
 (`WorkingDirectory` = this tree, `EnvironmentFile` = `.env`).
 
+## Build your own
+
+Simple guide: `docs/how-to-make-a-jarvis.md` — parts list, setup steps,
+and the three-endpoint contract. Includes `examples/minimal-brain.py`,
+an 80-line stdlib-only brain to start from.
+
 ## Endpoints (all Bearer `ALERT_WEBHOOK_TOKEN` except /health)
 
 - `GET /health` — liveness, outbox/player depth, STT/TTS health
