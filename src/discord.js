@@ -38,7 +38,8 @@ export function createDiscord({ config }) {
    * MUSE_SILENT_CHANNELS (an explicit @muse summon still opens a thread
    * there). Addressing: DMs, the owner's live voice-channel chat, and
    * MUSE's own summon threads are implicitly addressed; everywhere else the
-   * message must @-mention the bot or lead with "jarvis" (shared space).
+   * message must @-mention the bot (shared space) — the bare "jarvis" prefix
+   * no longer summons in guild channels.
    * An @muse mention in a guild channel opens (or reuses) a thread and the
    * reply lands there, keeping the channel itself clean. Queued as
    * { via: 'text', channelId } so the reply lands in the exact originating
@@ -75,10 +76,9 @@ export function createDiscord({ config }) {
       addressed = true;
       text = text.replace(mentionRe, ' ');
     }
-    if (!addressed && /^\s*(hey\s+)?jarvis[\s,.:;!?]+/i.test(text)) {
-      addressed = true;
-      text = text.replace(/^\s*(hey\s+)?jarvis[\s,.:;!?]+/i, '');
-    }
+    // Note: the bare "jarvis" prefix does NOT address the bot in guild
+    // channels — Hermes rules: in a chat channel you must @-mention the bot,
+    // which opens a thread. (DMs and the voice-channel chat stay implicit.)
     if (!addressed || !text.trim()) return;
 
     // Explicit @muse summon in a guild channel: converse in a thread so the
