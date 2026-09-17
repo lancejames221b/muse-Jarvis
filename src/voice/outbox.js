@@ -13,11 +13,13 @@
  * Typed owner messages reach this module via pushTextItem() with
  * { via: 'text', channelId } — same outbox, same pipeline, answered in text.
  *
- * In-memory ring buffer (last 50), monotonic ids. Served by the alert-webhook
- * HTTP server at GET /voice-inbox?since=<id> (same Bearer auth as /speak).
+ * Ring buffer (last 50), monotonic ids, persisted to disk
+ * (src/.voice-inbox-outbox.jsonl, gitignored) so unpolled utterances
+ * survive restarts and reboots. Served by the alert-webhook HTTP
+ * server at GET /voice-inbox.
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, renameSync } from 'node:fs';
 
 const MAX_ITEMS = 50;
 const DEDUP_WINDOW_MS = 10000; // drop identical text pushed within 10s (retry-path safety)
@@ -37,7 +39,41 @@ function saveNextId(n) {
 }
 
 let _nextId = loadNextId();
-const _items = []; // oldest -> newest
+
+// Disk persistence: the outbox items themselves survive bot restarts and
+// box reboots. Without this, utterances pushed but not yet polled by the
+// brain-side listener would be lost on reboot (the id counter already
+// survives, so the loss would be silent). Atomic rewrite on every push;
+// the file is gitignored (utterance text is private).
+const OUTBOX_FILE = new URL('../.voice-inbox-outbox.jsonl', import.meta.url);
+function loadOutbox() {
+  try {
+    const lines = readFileSync(OUTBOX_FILE, 'utf8').split('\n').filter((l) => l.trim());
+    const items = [];
+    for (const line of lines) {
+      try {
+        const it = JSON.parse(line);
+        if (it && Number.isFinite(it.id) && typeof it.text === 'string') items.push(it);
+      } catch {}
+    }
+    // Keep only the newest MAX_ITEMS, oldest -> newest.
+    return items.sort((a, b) => a.id - b.id).slice(-MAX_ITEMS);
+  } catch { return []; }
+}
+function saveOutbox(items) {
+  try {
+    const tmp = new URL('../.voice-inbox-outbox.jsonl.tmp', import.meta.url);
+    writeFileSync(tmp, items.map((i) => JSON.stringify(i)).join('\n') + (items.length ? '\n' : ''), 'utf8');
+    renameSync(tmp, OUTBOX_FILE);
+  } catch {}
+}
+
+const _items = loadOutbox(); // oldest -> newest
+// If items were restored, resume the id counter past the highest seen id.
+for (const it of _items) {
+  if (it.id >= _nextId) _nextId = it.id + 1;
+}
+saveNextId(_nextId);
 let _lastPush = { text: '', at: 0 };
 
 // -- Long-poll support ------------------------------------------------------
@@ -96,6 +132,7 @@ export function pushVoiceItem(text, opts = {}) {
   saveNextId(_nextId);
   _items.push(item);
   while (_items.length > MAX_ITEMS) _items.shift();
+  saveOutbox(_items);
   _wakeWaiters(); // long-poll: hand the new item to any hanging GETs
   return item;
 }
