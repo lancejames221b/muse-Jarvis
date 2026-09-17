@@ -1,6 +1,6 @@
 /**
- * discord.js — Discord client: login, thread-silence guard, typed input,
- * text fallback, owner server-mute. In threads it stays completely silent.
+ * discord.js — Discord client: login, typed input, text fallback, owner
+ * server-mute. Typed input works in every channel and thread the bot can see.
  */
 import { Client, GatewayIntentBits, Partials } from 'discord.js';
 import logger from './logger.js';
@@ -21,18 +21,20 @@ export function createDiscord({ config }) {
     partials: [Partials.Channel], // DM channels arrive as partials
   });
 
-  // Voice-only in threads: stay silent.
+  // Typed input in every channel and thread the bot can see. Addressing
+  // rules live in handleTextInput.
   client.on('messageCreate', (message) => {
-    if (message.channel?.isThread?.()) return;
     handleTextInput(message).catch((err) => logger.warn(`discord: text input failed: ${err.message}`));
   });
 
   /**
-   * Typed input from the owner. Accepted in: bot DMs, the main text channel,
-   * and the owner's live voice channel chat. Elsewhere — silent. DMs and the
-   * voice channel's chat are always addressed; in the main channel the
-   * message must @-mention the bot or lead with "jarvis" (shared space).
-   * Queued as { via: 'text', channelId }. Gated by TEXT_ENABLED.
+   * Typed input from allowed users. Accepted in every text channel the bot
+   * can see — DMs, guild channels, and threads. Addressing: DMs and the
+   * owner's live voice-channel chat are implicitly addressed; everywhere
+   * else the message must @-mention the bot or lead with "jarvis" (shared
+   * space). Queued as { via: 'text', channelId } so the reply lands in the
+   * exact originating channel or thread. Gated by TEXT_ENABLED and the
+   * allowed-user list. Text in, text out — never voice.
    */
   async function handleTextInput(message) {
     if (!config.textEnabled) return;
@@ -41,18 +43,16 @@ export function createDiscord({ config }) {
     const channel = message.channel;
     if (!channel) return;
     const isDM = !channel.guildId;
-    let accepted = isDM;
+    // The owner's live voice-channel chat is implicitly addressed — it
+    // follows him as he moves channels.
     let isVoiceChat = false;
-    if (!accepted && config.textChannelId && channel.id === config.textChannelId) accepted = true;
-    if (!accepted) {
+    if (!isDM) {
       const guild = client.guilds.cache.get(config.guildId);
       const member = guild?.members.cache.get(config.allowedUsers[0]);
       if (member?.voice?.channelId && channel.id === member.voice.channelId) {
-        accepted = true;
         isVoiceChat = true;
       }
     }
-    if (!accepted) return;
     const botId = client.user?.id;
     let text = message.content || '';
     let addressed = isDM || isVoiceChat;

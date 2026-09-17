@@ -113,9 +113,12 @@ The full guide — parts list, setup steps, the three-endpoint contract:
   channel's chat — the Discord record is complete: what you said, what
   Jarvis said back. Text fallback already posts text, so it is never
   duplicated.
-- **Typed input** (DMs, main channel, voice-channel chat) enters the same
-  queue tagged `via: 'text'` and gets text replies via `/send-text`.
-  Text in, text out — never voice playback for typed messages.
+- **Typed input** works in every channel and thread the bot can see. DMs and
+  the voice-channel chat are implicitly addressed; everywhere else @-mention
+  the bot or lead with "jarvis". It enters the same queue tagged
+  `via: 'text'` and gets text replies via `/send-text` to the exact
+  originating channel. Text in, text out — never voice playback for typed
+  messages.
 - When you aren't in voice, spoken replies degrade gracefully to text that
   *follows you*: your live channel's chat, then the main channel, then DM.
 

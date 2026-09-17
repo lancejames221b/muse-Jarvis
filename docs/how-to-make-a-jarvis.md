@@ -123,8 +123,8 @@ through `/speak`.
 
 **7. Talk.** Join the voice channel, say "Jarvis" — it answers. Say it once,
 then just keep talking for ~30 seconds (the follow-up window). Say "that's
-all" or "thanks" to close it. Or type to it: DMs and the voice
-channel's chat need no prefix; in the main channel @-mention the bot
+all" or "thanks" to close it. Or type to it, in any channel or thread: DMs and the voice
+channel's chat need no prefix; everywhere else @-mention the bot
 or lead with "jarvis". (Set `TEXT_ENABLED=false` to run voice-only.)
 
 ## How it works, in 30 seconds

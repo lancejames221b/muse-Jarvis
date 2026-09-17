@@ -47,6 +47,11 @@ The rules that make it feel like Jarvis instead of a chatbot:
   conversation's memory across sessions — not any single session's context.
 - **Long work goes to the background.** Anything over ~30 seconds should run
   async so the conversation loop keeps moving.
+- **Typed input is channel-agnostic.** Allowed users can type to the bot in
+  any channel or thread it can see — DMs and the voice-channel chat are
+  implicitly addressed; shared channels need an @-mention or a leading
+  "jarvis". Replies go back to the exact `channelId` via `/send-text`.
+  Text in, text out — typed messages never get voice playback.
 
 ## The system prompt
 
