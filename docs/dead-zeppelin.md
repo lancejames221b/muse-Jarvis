@@ -3,7 +3,7 @@
 *Marvel-Jarvis capabilities on my own iron, secured by Tailscale — a personal
 agentic AI system in the palm of my hand.*
 
-Everybody's AI lives in somebody else's cloud. Mine lives in my house.
+Everybody's AI lives in somebody else's cloud. Mine lives on my own iron — the voice box in my house, the mind in a persistent Muse session.
 
 It has a voice. It hears me through Discord, transcribes what I say, thinks
 about it, and answers back out loud — in a cloned voice, into the voice

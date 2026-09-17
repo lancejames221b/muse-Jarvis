@@ -1,58 +1,142 @@
 # muse-Jarvis
 
-Discord voice interface for a personal assistant. A deliberately dumb pipe:
-it hears, transcribes, queues, and speaks. All judgment lives elsewhere.
+Talk to your own JARVIS in Discord. You speak, it answers out loud — in a
+cloned voice, right in the voice channel.
 
-## What it does
+The bot itself is deliberately dumb: it hears, transcribes, queues, and
+speaks. All the thinking happens in a separate **brain** — a script you
+control, or a full agent session. One mind, dumb edges.
 
-- Joins a Discord voice channel and follows the owner between channels.
-- Transcribes speech (wake phrase `jarvis`, 30s follow-up window) via
-  faster-whisper, pushes utterances to an in-memory outbox.
-- Serves the outbox at `GET /voice-inbox` (Bearer auth, cursor-based,
-  no-duplicates, best-effort in-memory ring) and speaks replies via
-  `POST /speak` (Chatterbox TTS).
-- Typed owner input (bot DMs, #general, voice-channel chat) is queued the
-  same way, tagged `via: 'text'`, and answered in text via
-  `POST /send-text`. Text in, text out.
-- When the owner isn't in voice, spoken replies fall back to text: his live
-  voice channel's chat, then the configured main channel, then DM.
+## Play with it first
 
-## What it doesn't do
+The fastest way to hear it talk takes about ten minutes. You don't even need
+a microphone or a GPU to start — the bot has a test endpoint that injects a
+fake utterance, so you can watch the whole loop work end to end.
 
-No conversational model, no tools, no decisions. It never answers on its
-own — a separate worker drains the outbox and is the sole responder.
+**1. Get a Discord bot token** (5 minutes, free): in the
+[Discord developer portal](https://discord.com/developers/applications),
+create an application → Bot → copy the token → OAuth2 URL Generator →
+scope `bot` → open the URL and add it to your server. Then under
+Bot → Privileged Gateway Intents, enable **Message Content Intent**
+(typed messages need it).
 
-## Run
+**2. Run the bot:**
+
+```bash
+git clone https://github.com/lancejames221b/muse-Jarvis.git
+cd muse-Jarvis
+npm ci
+cp .env.example .env   # fill in DISCORD_TOKEN + a long random ALERT_WEBHOOK_TOKEN
+node src/index.js
+# or: node src/index.js --check-config   (validates .env without connecting)
+```
 
 Requires **Node ≥ 24** and a C++ toolchain for the native `@discordjs/opus`
 module (`python3`, `make`, `g++` — e.g. `build-essential` on Debian/Ubuntu).
 
+**3. Run the example brain** — 80 lines of stdlib-only Python
+(`examples/minimal-brain.py`), talking to any OpenAI-compatible LLM endpoint:
+
 ```bash
-npm ci
-cp .env.example .env   # fill in DISCORD_TOKEN, ALERT_WEBHOOK_TOKEN, ids
-node src/index.js
-# or: npm start        (same thing)
+export JARVIS_LLM_URL=http://your-llm:1234/v1/chat/completions
+export JARVIS_LLM_MODEL=your-model
+# export JARVIS_LLM_KEY=...   # only if your endpoint needs one
+python3 examples/minimal-brain.py
 ```
 
-Design write-up (the Dead Zeppelin post — personal agentic AI, Tailscale security, replication guide):
-`docs/dead-zeppelin.md`.
+**4. Fake an utterance** — no mic needed:
 
-Systemd user unit template: `examples/jarvis-voice.service`
-(`WorkingDirectory` = this tree, `EnvironmentFile` = `.env`).
+```bash
+curl -X POST http://localhost:3335/voice-inbox/test \
+  -H "Authorization: Bearer YOUR_WEBHOOK_TOKEN" \
+  -H 'Content-Type: application/json' \
+  -d '{"text":"Jarvis, say hello"}'
+```
 
-## Build your own
+The brain answers through `/speak` — out loud if you're in the voice
+channel, as text where you'll see it if you're not. That's the whole loop.
+Everything after this is making the voice real and the brain smarter.
 
-Simple guide: `docs/how-to-make-a-jarvis.md` — parts list, setup steps,
-and the three-endpoint contract. Includes `examples/minimal-brain.py`,
-an 80-line stdlib-only brain to start from.
+## Make it real
 
-## Endpoints (all Bearer `ALERT_WEBHOOK_TOKEN` except /health)
+- **Speech.** Self-host [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
+  (STT) and [Chatterbox](https://github.com/resemble-ai/chatterbox) (TTS, cloned
+  voice) — or anything that implements the two HTTP contracts in
+  `docs/speech-services.md`. Reference servers live in `examples/`.
+- **Network.** Put your machines on [Tailscale](https://tailscale.com) first.
+  Nothing you run should listen on the public internet — that's the security
+  model, and it's the whole reason this is safe to run.
+- **Brain.** Grow `minimal-brain.py` into whatever agent loop you trust: tools,
+  memory, background work. The production brain here is a persistent
+  [Muse](https://muse.ai) agent session. The contract never changes: poll the
+  queue, answer through `/speak`.
 
-`TEXT_ENABLED` (default true) gates typed input and `/send-text`.
-`POST /send-text` returns 409 while it is off. `/speak` keeps its
-text fallback when you are not in voice.
+The full guide — parts list, setup steps, the three-endpoint contract:
+`docs/how-to-make-a-jarvis.md`.
 
-- `GET /health` — liveness, outbox/player depth, STT/TTS health
-- `GET /voice-inbox?since=<id>&wait=<s>` — long-pollable outbox
-- `POST /speak {message}` — voice if the owner is in channel, else text fallback
-- `POST /send-text {channelId, message}` — text reply to a channel
+## How it works
+
+```
+ your voice
+     │
+     ▼
+┌──────────┐  audio   ┌──────────┐  wav   ┌─────┐  text  ┌──────────┐
+│ Discord  │ ───────▶  │   bot    │ ─────▶ │ STT │ ─────▶ │  outbox  │ ◀── poll ── brain
+│  voice   │          │  (dumb   │        │     │        │ /voice-   │     (you)
+│ channel  │ ◀───────  │  pipe)   │ ◀───── │ TTS │ ◀───── │  inbox   │
+└──────────┘  audio   └──────────┘  wav   └─────┘  text  └──────────┘
+                                    ▲  /speak · /send-text
+```
+
+- Say **"Jarvis"** once → ~30s follow-up window, just keep talking.
+  "That's all" / "thanks" closes it.
+- **Silence by default.** The mic hears everything — conversations, phone
+  calls, humming. Only clearly-addressed speech is ever answered.
+- **Typed input** (DMs, main channel, voice-channel chat) enters the same
+  queue tagged `via: 'text'` and gets text replies via `/send-text`.
+  Text in, text out — never voice playback for typed messages.
+- When you aren't in voice, spoken replies degrade gracefully to text that
+  *follows you*: your live channel's chat, then the main channel, then DM.
+
+## What it doesn't do
+
+No conversational model, no tools, no decisions. It never answers on its own —
+a separate worker drains the outbox and is the sole responder. If the bot ever
+seems smart, that's your brain, not the bot.
+
+## Endpoints
+
+All Bearer-guarded with `ALERT_WEBHOOK_TOKEN` (except `/health`).
+
+| Endpoint | What it does |
+|---|---|
+| `GET /health` | Liveness, outbox/player depth, STT/TTS health |
+| `GET /voice-inbox?since=<id>&wait=<s>` | Long-pollable outbox; cursor-based, no-duplicate best-effort delivery |
+| `POST /speak {message}` | Voice if you're in the channel, else text fallback |
+| `POST /send-text {channelId, message}` | Text reply to a typed message, in its channel |
+| `POST /voice-inbox/test {text}` | Inject a synthetic utterance (no-mic smoke test) |
+
+`TEXT_ENABLED` (default `true`) gates typed input and `/send-text`;
+`POST /send-text` returns 409 while off.
+
+## Docs
+
+- `docs/how-to-make-a-jarvis.md` — the build guide: parts, steps, contract.
+- `docs/speech-services.md` — the exact STT/TTS HTTP contracts.
+- `docs/dead-zeppelin.md` — the design essay: personal agentic AI, the
+  Tailscale security model, and why dumb pipes win.
+- `examples/` — `minimal-brain.py` (80-line brain), `stt-server.py`
+  (reference faster-whisper server), `jarvis-voice.service` (systemd template).
+
+## Acknowledgments
+
+Built on [discord.js](https://discord.js.org),
+[faster-whisper](https://github.com/SYSTRAN/faster-whisper),
+[Chatterbox](https://github.com/resemble-ai/chatterbox),
+[Tailscale](https://tailscale.com), and [Muse](https://muse.ai).
+The dumb-pipe idea is old; the network that makes it safe is new.
+
+---
+
+MIT — see [LICENSE](LICENSE). If this makes you smile, a ⭐ is the cheapest
+way to say thanks.
