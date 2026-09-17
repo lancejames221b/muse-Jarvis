@@ -143,6 +143,10 @@ All Bearer-guarded with `ALERT_WEBHOOK_TOKEN` (except `/health`).
 `TEXT_ENABLED` (default `true`) gates typed input and `/send-text`;
 `POST /send-text` returns 409 while off.
 
+`JARVIS_FOLLOW_USER_VOICE` (default `true`): when `true` the bot follows the owner
+across voice channels; set to `false` to pin it in its current channel (it will not
+trail you when you switch channels).
+
 ## Docs
 
 - `docs/how-to-make-a-jarvis.md` — the build guide: parts, steps, contract.

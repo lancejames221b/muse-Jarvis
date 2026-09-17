@@ -3,7 +3,8 @@
  *
  * Channel resolution: the owner's live voice channel wins; otherwise
  * DISCORD_VOICE_CHANNEL_ID when it's a real snowflake. Follows the owner
- * across channels via voiceStateUpdate. Reconnects with backoff.
+ * across channels via voiceStateUpdate unless JARVIS_FOLLOW_USER_VOICE is false.
+ * Reconnects with backoff.
  */
 import {
   joinVoiceChannel,
@@ -152,6 +153,10 @@ export function createVoiceConnection({ client, config, onJoined }) {
 
   /** Follow the owner when they move voice channels. */
   function watchOwner() {
+    if (!config.followUserVoice) {
+      logger.info('voice: JARVIS_FOLLOW_USER_VOICE is off — staying in current channel');
+      return;
+    }
     client.on('voiceStateUpdate', (oldState, newState) => {
       if (newState.id !== ownerId) return;
       const joined = newState.channelId;
