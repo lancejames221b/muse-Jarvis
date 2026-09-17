@@ -116,8 +116,10 @@ brain round-trip before ever joining a voice channel.
 
 That's it — a talking assistant. The production version of the brain is a
 persistent Muse agent: it classifies (answer now / work in background / stay
-silent), uses tools, and keeps a transcript ledger. But the contract never
-changes: poll the queue, answer through `/speak`.
+silent), uses tools, and keeps a transcript ledger. Full operator setup —
+the loop, behavior rules, and a paste-ready brief — is in
+`docs/muse-brain.md`. But the contract never changes: poll the queue, answer
+through `/speak`.
 
 **7. Talk.** Join the voice channel, say "Jarvis" — it answers. Say it once,
 then just keep talking for ~30 seconds (the follow-up window). Say "that's

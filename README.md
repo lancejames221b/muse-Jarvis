@@ -73,10 +73,11 @@ Everything after this is making the voice real and the brain smarter.
 - **Network.** Put your machines on [Tailscale](https://tailscale.com) first.
   Nothing you run should listen on the public internet — that's the security
   model, and it's the whole reason this is safe to run.
-- **Brain.** Grow `minimal-brain.py` into whatever agent loop you trust: tools,
-  memory, background work. The production brain here is a persistent
-  [Muse](https://muse.ai) agent session. The contract never changes: poll the
-  queue, answer through `/speak`.
+- **Brain.** The real brain is a persistent [Muse](https://muse.ai) agent
+  session — `docs/muse-brain.md` has the loop, the behavior rules, and a
+  paste-ready operator brief to turn your Muse into the mind.
+  `examples/minimal-brain.py` is the 80-line stand-in for smoke-testing.
+  The contract never changes: poll the queue, answer through `/speak`.
 
 The full guide — parts list, setup steps, the three-endpoint contract:
 `docs/how-to-make-a-jarvis.md`.
@@ -129,6 +130,8 @@ All Bearer-guarded with `ALERT_WEBHOOK_TOKEN` (except `/health`).
 ## Docs
 
 - `docs/how-to-make-a-jarvis.md` — the build guide: parts, steps, contract.
+- `docs/muse-brain.md` — run the brain as a persistent Muse agent session:
+  the loop, behavior rules, and a paste-ready operator brief.
 - `docs/speech-services.md` — the exact STT/TTS HTTP contracts.
 - `docs/dead-zeppelin.md` — the design essay: personal agentic AI, the
   Tailscale security model, and why dumb pipes win.
