@@ -75,7 +75,7 @@ Everything after this is making the voice real and the brain smarter.
   voice) — or anything that implements the two HTTP contracts in
   `docs/speech-services.md`. A reference faster-whisper server is
   `examples/stt-server.py`; the TTS side is any Chatterbox HTTP wrapper
-  exposing the `/tts` contract.
+  exposing the `/tts` contract. The author's own setup speaks through a Paul Bettany voice clone.
 - **Network.** Put your machines on [Tailscale](https://tailscale.com) first.
   Nothing you run should listen on the public internet — that's the security
   model, and it's the whole reason this is safe to run.
