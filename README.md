@@ -4,8 +4,8 @@ Talk to your own JARVIS in Discord. You speak, it answers out loud — in a
 cloned voice, right in the voice channel.
 
 The bot itself is deliberately dumb: it hears, transcribes, queues, and
-speaks. All the thinking happens in a separate **brain** — a script you
-control, or a full agent session. One mind, dumb edges.
+speaks. All the thinking happens in a separate **brain**: a persistent Muse
+agent session with tools, memory, and judgment. One mind, dumb edges.
 
 ## Play with it first
 
@@ -34,8 +34,9 @@ node src/index.js
 Requires **Node ≥ 24** and a C++ toolchain for the native `@discordjs/opus`
 module (`python3`, `make`, `g++` — e.g. `build-essential` on Debian/Ubuntu).
 
-**3. Run the example brain** — 80 lines of stdlib-only Python
-(`examples/minimal-brain.py`), talking to any OpenAI-compatible LLM endpoint:
+**3. Run a brain.** The quick smoke test is `examples/minimal-brain.py` —
+80 lines of stdlib-only Python that answers through any OpenAI-compatible
+chat endpoint:
 
 ```bash
 export JARVIS_LLM_URL=http://your-llm:1234/v1/chat/completions
@@ -43,6 +44,12 @@ export JARVIS_LLM_MODEL=your-model
 # export JARVIS_LLM_KEY=...   # only if your endpoint needs one
 python3 examples/minimal-brain.py
 ```
+
+That's a stand-in to prove the loop works. The real brain is a persistent
+**Muse** agent session: it polls the outbox, decides per utterance whether to
+answer now, work in the background, or stay silent, and replies through
+`/speak` — with tools, memory, and judgment. The agent that builds the
+system is the mind that runs it.
 
 **4. Fake an utterance** — no mic needed:
 

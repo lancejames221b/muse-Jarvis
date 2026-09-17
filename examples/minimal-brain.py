@@ -2,7 +2,8 @@
 """
 minimal-brain.py — the simplest possible "mind" for muse-Jarvis.
 
-Long-polls the bot's /voice-inbox, sends each utterance to any
+A stand-in for the real brain (a persistent Muse agent session): it
+long-polls the bot's /voice-inbox, sends each utterance to any
 OpenAI-compatible chat endpoint, and answers back:
   - spoken utterances -> POST /speak  (voice if you're in the channel,
     text fallback otherwise)
