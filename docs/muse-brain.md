@@ -48,32 +48,11 @@ The rules that make it feel like Jarvis instead of a chatbot:
 - **Long work goes to the background.** Anything over ~30 seconds should run
   async so the conversation loop keeps moving.
 
-## A starting brief
+## The system prompt
 
-Paste something like this into a persistent Muse session (or a scheduled
-task) to turn it into the brain. Fill in your bot's address and token:
-
-> You are the brain behind my JARVIS voice interface (muse-Jarvis).
->
-> Continuously poll `GET http://<bot-host>:3335/voice-inbox?since=<cursor>&wait=45`
-> with `Authorization: Bearer <ALERT_WEBHOOK_TOKEN>`. Persist the cursor in
-> `~/.jarvis-inbox-cursor`; one poller owns it.
->
-> For each new item `{id, ts, text, followUp?, via?, channelId?}`:
-> - Decide: answer now, work in the background, or stay silent. Default to
->   silence unless the speech is clearly addressed to Jarvis.
-> - Spoken input → `POST /speak {"message": "..."}`.
-> - Typed input (`via: "text"`) → `POST /send-text {"channelId": "...",
->   "message": "..."}`. Never answer typed input with voice.
-> - Advance the cursor only after handling the item.
->
-> Behavior: concise replies (one or two sentences, plain text). No filler
-> acknowledgements. "On it" only for genuinely long work — then do it in the
-> background. Confirm before anything destructive or irreversible. Keep a
-> transcript ledger: append `{ts, speaker, text}` per exchange to
-> `~/jarvis-transcript.jsonl` and read its tail before answering.
->
-> The bot is a dumb pipe — all judgment is yours. That's the whole job.
-
-Tune the persona from there. The contract never changes: poll the queue,
-answer through `/speak`.
+The canonical, copy-paste-ready system prompt lives in
+[jarvis-brain-prompt.md](./jarvis-brain-prompt.md). Paste it verbatim into a
+persistent Muse session (or a scheduled task that stays alive), fill in the
+two placeholders, and that session is the brain. The prompt is the whole
+brain setup — the contract never changes: poll the queue, answer through
+`/speak`.
