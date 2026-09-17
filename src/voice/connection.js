@@ -37,7 +37,11 @@ export function createVoiceConnection({ client, config, onJoined }) {
   }
 
   function targetChannelId() {
-    return ownerVoiceChannelId() || config.voiceChannelId || null;
+    // The bot's voice home is sticky: a configured DISCORD_VOICE_CHANNEL_ID
+    // wins on startup (the owner's "wherever you are is where I want you").
+    // Falls back to the owner's live channel only when none is configured.
+    const configured = /^\d+$/.test(config.voiceChannelId || '') ? config.voiceChannelId : null;
+    return configured || ownerVoiceChannelId() || null;
   }
 
   function isUserInVoice(userId) {
