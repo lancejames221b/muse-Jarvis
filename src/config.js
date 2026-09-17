@@ -28,6 +28,13 @@ function _bool(name, def) {
   return raw.toLowerCase() !== 'false';
 }
 
+// Comma-separated id list.
+function _list(name) {
+  const raw = process.env[name];
+  if (raw == null || raw === '') return [];
+  return raw.split(',').map((s) => s.trim()).filter(Boolean);
+}
+
 // Strict bool: accepts only true/false/1/0 (case-insensitive); falls back to def otherwise.
 function _boolStrict(name, def) {
   const raw = process.env[name];
@@ -65,6 +72,8 @@ export function loadConfig() {
     conversationModeEnabled: _bool('JARVIS_CONVERSATION_MODE_ENABLED', true),
     transcriptFeed: _bool('JARVIS_TRANSCRIPT_FEED', true),
     textEnabled: _bool('TEXT_ENABLED', true),
+    // Channel ids where typed input is ignored (MUSE stays silent there).
+    silentTextChannels: _list('MUSE_SILENT_CHANNELS'),
     // true = follow the owner's voice channel (current behavior); false = stay put.
     followUserVoice: _boolStrict('JARVIS_FOLLOW_USER_VOICE', true),
     borderlineConfidence: _num('BORDERLINE_CONFIDENCE', 0.55),

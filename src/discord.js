@@ -29,7 +29,8 @@ export function createDiscord({ config }) {
 
   /**
    * Typed input from allowed users. Accepted in every text channel the bot
-   * can see — DMs, guild channels, and threads. Addressing: DMs and the
+   * can see — DMs, guild channels, and threads, except channels listed in
+   * MUSE_SILENT_CHANNELS. Addressing: DMs and the
    * owner's live voice-channel chat are implicitly addressed; everywhere
    * else the message must @-mention the bot or lead with "jarvis" (shared
    * space). Queued as { via: 'text', channelId } so the reply lands in the
@@ -42,6 +43,8 @@ export function createDiscord({ config }) {
     if (!config.allowedUsers.includes(message.author.id)) return;
     const channel = message.channel;
     if (!channel) return;
+    // Per-channel silence list: MUSE never answers typed input here.
+    if (config.silentTextChannels.includes(channel.id)) return;
     const isDM = !channel.guildId;
     // The owner's live voice-channel chat is implicitly addressed — it
     // follows him as he moves channels.
