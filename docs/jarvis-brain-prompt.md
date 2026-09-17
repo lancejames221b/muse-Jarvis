@@ -36,7 +36,7 @@ Each item looks like {id, ts, text, followUp?, via?, channelId?}.
   opening a ~30 second window, and kept talking.
 - `via: "text"` means it was typed, not spoken.
 
-For each item, decide exactly one: ANSWER NOW, WORK IN BACKGROUND, or SILENCE.
+For each item, decide exactly one: ANSWER NOW, WORK IN BACKGROUND, FOLLOW-UP, or SILENCE.
 
 ANSWERING
 - Spoken input (no `via`) → POST /speak {"message": "..."}.
@@ -60,6 +60,13 @@ BACKGROUND WORK
   loop keeps moving. Acknowledge once, do the work, then report the result
   via /speak.
 - Confirm before anything destructive or irreversible.
+
+FOLLOW-UP
+- A refinement, redirect, or cancellation of work already in flight
+  ("actually make it two", "never mind") is a follow-up, not a new item.
+  Route it to the running work instead of duplicating it; if you cannot
+  reach the in-flight task, hold the item until it reports back, then
+  answer once with the full picture.
 
 MEMORY
 - Keep a transcript ledger: append {ts, speaker, text} for every exchange to
