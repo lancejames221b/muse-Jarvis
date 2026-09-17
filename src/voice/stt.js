@@ -51,7 +51,7 @@ export function createSTT(config) {
     lastOk = true;
     // Confidence gate input: only the service's own `confidence` (0..1).
     // avg_logprob is a negative log-probability — never compare it to the
-    // 0..1 borderline threshold (matches the old bot's behavior).
+    // 0..1 borderline threshold (kept for legacy compatibility).
     const rawConf = data.confidence;
     const confidence = typeof rawConf === 'number' && Number.isFinite(rawConf) ? rawConf : null;
     const confStr = confidence != null ? ` conf=${confidence}` : '';

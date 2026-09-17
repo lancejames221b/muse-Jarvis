@@ -42,7 +42,8 @@ Not a chatbot with a wake word. A system:
   and plays back speech from a local TTS service (Chatterbox, cloned voice).
   Dumb pipes are reliable pipes.
 - **One mind.** Every utterance the bot accepts goes into a dead-simple HTTP
-  outbox — a queue with a cursor, Bearer auth, exactly-once delivery. A tiny
+  outbox — a queue with a cursor, Bearer auth, no-duplicate best-effort delivery.
+  A tiny
   poller drains it. The *mind* is a persistent agent session running on Muse:
   it reads each item, decides whether to answer, work in the background, or
   stay silent, and sends replies back through the same pipe. All judgment in
@@ -82,8 +83,9 @@ config:
 1. **Tailscale first.** Put your machines and your phone on one tailnet. This
    is the foundation everything else stands on.
 2. **Ears and mouth.** Clone `muse-Jarvis`, `cp .env.example .env`, fill in
-   your Discord token and IDs, `npm ci`, run it. Any STT/TTS behind the same
-   HTTP shape works — the contract is three endpoints and a cursor.
+   your Discord token and IDs, `npm ci`, run it. Any STT/TTS behind the
+   documented HTTP shape works — the contract is `docs/speech-services.md`
+   plus three endpoints and a cursor.
 3. **A mind.** Point any poller at `/voice-inbox`, answer through `/speak`.
    The brain can be any agent loop you trust; mine runs on Muse.
 4. **Keep the queue boring.** The temptation is to make the protocol clever.

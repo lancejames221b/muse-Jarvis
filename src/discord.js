@@ -21,7 +21,7 @@ export function createDiscord({ config }) {
     partials: [Partials.Channel], // DM channels arrive as partials
   });
 
-  // Voice-only in threads: stay silent (ported from the old bot).
+  // Voice-only in threads: stay silent.
   client.on('messageCreate', (message) => {
     if (message.channel?.isThread?.()) return;
     handleTextInput(message).catch((err) => logger.warn(`discord: text input failed: ${err.message}`));

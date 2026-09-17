@@ -6,10 +6,12 @@
  *   POST /speak {message}                     Bearer; exact-hash dedup (60s);
  *                                             200ms in-flight mutex; voice or
  *                                             text fallback
+ *   POST /send-text {channelId, message}      Bearer; text reply into a channel;
+ *                                             409 when TEXT_ENABLED=false
  *   GET  /health                               {ok, voice, outboxDepth, stt, tts}
  */
 import { createServer } from 'node:http';
-import { createHash } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
 import logger from './logger.js';
 import { getVoiceItems, waitForVoicePush, pushTestItem, inboxSize } from './voice/outbox.js';
 
@@ -47,7 +49,9 @@ export function createHttp({ config, player, voiceConn, discord, stt, tts, route
   }
 
   function authorized(req) {
-    return req.headers.authorization === `Bearer ${token}`;
+    const presented = Buffer.from(req.headers.authorization || '');
+    const expected = Buffer.from(`Bearer ${token}`);
+    return presented.length === expected.length && timingSafeEqual(presented, expected);
   }
 
   function isInFlight(message) {
@@ -77,7 +81,8 @@ export function createHttp({ config, player, voiceConn, discord, stt, tts, route
   async function handleVoiceInbox(req, res, url) {
     const since = parseInt(url.searchParams.get('since') || '0', 10) || 0;
     let wait = parseInt(url.searchParams.get('wait'), 10);
-    if (!Number.isInteger(wait) || wait < 1 || wait > 60) wait = 0;
+    if (!Number.isInteger(wait) || wait < 1) wait = 0;
+    else if (wait > 60) wait = 60; // clamp: an out-of-range wait used to hot-poll silently
     let items = getVoiceItems(since);
     if (items.length === 0 && wait > 0) {
       const waiter = waitForVoicePush(wait * 1000);
@@ -201,7 +206,7 @@ export function createHttp({ config, player, voiceConn, discord, stt, tts, route
 
   function listen() {
     const port = config.webhookPort;
-    const host = process.env.HTTP_HOST || '::'; // dual-stack: covers 127.0.0.1 and [::1]
+    const host = process.env.HTTP_HOST || '127.0.0.1'; // loopback by default; set HTTP_HOST='::' to bind all interfaces (LAN-visible)
     return new Promise((resolve) => {
       server.listen(port, host, () => {
         logger.info(`http: listening on [${host}]:${port}`);

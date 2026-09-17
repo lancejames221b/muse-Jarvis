@@ -70,14 +70,20 @@ def main():
             time.sleep(5)
             continue
         for it in items:
+            try:
+                reply = think(it["text"])
+                if it.get("via") == "text" and it.get("channelId"):
+                    bot("POST", "/send-text",
+                        {"channelId": it["channelId"], "message": reply})
+                else:
+                    bot("POST", "/speak", {"message": reply})
+            except Exception as e:
+                # Anything failed: stop here WITHOUT advancing the cursor,
+                # so this item is retried on the next poll instead of lost.
+                print(f"item {it.get('id')}: failed ({e}); will retry")
+                break
             cursor = max(cursor, it["id"])
             open(CURSOR_FILE, "w").write(str(cursor))
-            reply = think(it["text"])
-            if it.get("via") == "text":
-                bot("POST", "/send-text",
-                    {"channelId": it["channelId"], "message": reply})
-            else:
-                bot("POST", "/speak", {"message": reply})
 
 
 if __name__ == "__main__":

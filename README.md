@@ -9,7 +9,8 @@ it hears, transcribes, queues, and speaks. All judgment lives elsewhere.
 - Transcribes speech (wake phrase `jarvis`, 30s follow-up window) via
   faster-whisper, pushes utterances to an in-memory outbox.
 - Serves the outbox at `GET /voice-inbox` (Bearer auth, cursor-based,
-  exactly-once) and speaks replies via `POST /speak` (Chatterbox TTS).
+  no-duplicates, best-effort in-memory ring) and speaks replies via
+  `POST /speak` (Chatterbox TTS).
 - Typed owner input (bot DMs, #general, voice-channel chat) is queued the
   same way, tagged `via: 'text'`, and answered in text via
   `POST /send-text`. Text in, text out.
@@ -23,16 +24,20 @@ own — a separate worker drains the outbox and is the sole responder.
 
 ## Run
 
+Requires **Node ≥ 24** and a C++ toolchain for the native `@discordjs/opus`
+module (`python3`, `make`, `g++` — e.g. `build-essential` on Debian/Ubuntu).
+
 ```bash
 npm ci
 cp .env.example .env   # fill in DISCORD_TOKEN, ALERT_WEBHOOK_TOKEN, ids
 node src/index.js
+# or: npm start        (same thing)
 ```
 
 Design write-up (the Dead Zeppelin post — personal agentic AI, Tailscale security, replication guide):
 `docs/dead-zeppelin.md`.
 
-Systemd user unit: `jarvis-voice.service`
+Systemd user unit template: `examples/jarvis-voice.service`
 (`WorkingDirectory` = this tree, `EnvironmentFile` = `.env`).
 
 ## Build your own

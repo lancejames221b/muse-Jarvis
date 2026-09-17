@@ -1,5 +1,5 @@
 /**
- * voice-inbox.js — Outbox of [VOICE] transcriptions for the Muse-side listener.
+ * outbox.js — Outbox of [VOICE] transcriptions for the brain-side listener.
  *
  * POSITIVE MATCH ONLY: the bot pushes an item here at the true voice ingress —
  * handleSpeech (index.js) is invoked solely from the Discord voice-channel
@@ -8,7 +8,7 @@
  * wake phrase stripped, empty remainders skipped).
  * Marvel-style conversation mode: once "Jarvis" opens a follow-up window,
  * subsequent in-window utterances are pushed WITHOUT the wake word and carry
- * { followUp: true } so the Muse-side listener can tell them apart.
+ * { followUp: true } so the brain-side listener can tell them apart.
  * The [VOICE] prompt tag is a separate downstream flag and is NOT the trigger.
  * Typed owner messages reach this module via pushTextItem() with
  * { via: 'text', channelId } — same outbox, same pipeline, answered in text.
@@ -22,8 +22,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 const MAX_ITEMS = 50;
 const DEDUP_WINDOW_MS = 10000; // drop identical text pushed within 10s (retry-path safety)
 
-// Monotonic ids must survive bot restarts: the Muse-side cursor persists in
-// ~/.jarvis/.voice-inbox-cursor, so an id reset would make
+// Monotonic ids must survive bot restarts: the brain's cursor is stored on
+// its own side, so an id reset would make
 // post-restart utterances invisible (id <= cursor). Persist the counter.
 const NEXT_ID_FILE = new URL('../.voice-inbox-nextid', import.meta.url);
 function loadNextId() {

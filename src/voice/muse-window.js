@@ -9,7 +9,7 @@
  * This is SEPARATE from the bot's own conversation window
  * (voice/wakeword.js: markBotResponse/lastBotResponseTime, CONVERSATION_WINDOW_MS).
  * That one gates the bot's local LLM brain; this one gates what gets pushed to
- * the Muse-side voice inbox (voice-inbox.js). The two windows are independent by
+ * the brain-side voice inbox. The two windows are independent by
  * design: the bot's brain stands down for Muse-routed utterances.
  *
  * Env knobs:
