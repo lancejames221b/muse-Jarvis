@@ -47,7 +47,33 @@ const router = createRouter({
   player,
   allowedUsers: config.allowedUsers,
   conversationModeEnabled: config.conversationModeEnabled,
+  onHeard: (text, kind) => { postTranscriptFeed(text, kind); },
 });
+
+/**
+ * Transcript ticker: every utterance the router accepts as addressed to
+ * Jarvis is posted to the voice channel's text chat, so the owner can see
+ * they're heard. Fire-and-forget — failures are logged, never thrown, so
+ * the feed can never break the voice pipeline.
+ */
+async function postTranscriptFeed(text, kind) {
+  try {
+    if (!config.transcriptFeed) return;
+    const channelId = voiceConn?.getChannelId?.() || null;
+    if (!channelId) return;
+    const client = discord?.client;
+    if (!client) return;
+    const ch = client.channels.cache.get(channelId)
+      || await client.channels.fetch(channelId).catch(() => null);
+    if (!ch || typeof ch.send !== 'function') return;
+    const t = String(text || '').trim().slice(0, 400);
+    if (!t) return;
+    const msg = kind === 'bareWake' ? `🎙️ "${t}" — listening…` : `🎙️ "${t}"`;
+    await ch.send(msg);
+  } catch (err) {
+    logger.warn(`transcript feed: ${err?.message || err}`);
+  }
+}
 
 voiceConn = createVoiceConnection({
   client: discord.client,

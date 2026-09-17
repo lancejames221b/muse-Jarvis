@@ -104,6 +104,9 @@ The full guide — parts list, setup steps, the three-endpoint contract:
   "That's all" / "thanks" closes it.
 - **Silence by default.** The mic hears everything — conversations, phone
   calls, humming. Only clearly-addressed speech is ever answered.
+- **Transcript ticker.** Every utterance accepted as addressed to Jarvis is
+  posted to the voice channel's text chat, so you can see you're heard.
+  Disable with `JARVIS_TRANSCRIPT_FEED=false`.
 - **Typed input** (DMs, main channel, voice-channel chat) enters the same
   queue tagged `via: 'text'` and gets text replies via `/send-text`.
   Text in, text out — never voice playback for typed messages.

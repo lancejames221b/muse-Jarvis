@@ -4,6 +4,11 @@
  * Wake regex -> conversation window -> hum filter -> outbox.push.
  * No isSideTalk: ambient/side-talk judgment belongs to the Muse worker
  * (dumb-pipe doctrine). Close phrases close the window + cancel playback.
+ *
+ * Heard-feedback: whenever the router accepts something addressed to Jarvis
+ * (wake+command, follow-up, bare wake), it calls the optional onHeard(text,
+ * kind) hook so the wiring layer can show a transcript ticker. The hook is
+ * fire-and-forget and must never break routing.
  */
 import {
   openMuseConversationWindow,
@@ -16,7 +21,7 @@ import logger from '../logger.js';
 
 const WAKE_RE = /^(hey[^a-z0-9]*)?jarvis\b[^a-z0-9]*/i;
 
-export function createRouter({ outbox, player, allowedUsers, conversationModeEnabled }) {
+export function createRouter({ outbox, player, allowedUsers, conversationModeEnabled, onHeard }) {
   function route(userId, text) {
     if (!allowedUsers.includes(userId)) return;
     const t = String(text || '').trim();
@@ -39,9 +44,13 @@ export function createRouter({ outbox, player, allowedUsers, conversationModeEna
       if (conversationModeEnabled) openMuseConversationWindow(userId);
       if (cmd) {
         const item = outbox.pushVoiceItem(cmd);
-        if (item) logger.info(`router: inbox #${item.id} "${cmd.substring(0, 60)}"`);
+        if (item) {
+          logger.info(`router: inbox #${item.id} "${cmd.substring(0, 60)}"`);
+          try { onHeard?.(cmd, 'command'); } catch {}
+        }
       } else {
         logger.info('router: bare wake — window opened, nothing pushed');
+        try { onHeard?.(t, 'bareWake'); } catch {}
       }
       return;
     }
@@ -62,6 +71,7 @@ export function createRouter({ outbox, player, allowedUsers, conversationModeEna
       if (item) {
         logger.info(`router: inbox #${item.id} (follow-up) "${t.substring(0, 60)}"`);
         openMuseConversationWindow(userId); // refresh on each follow-up
+        try { onHeard?.(t, 'followUp'); } catch {}
       }
       return;
     }
