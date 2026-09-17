@@ -73,7 +73,9 @@ Everything after this is making the voice real and the brain smarter.
 - **Speech.** Self-host [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
   (STT) and [Chatterbox](https://github.com/resemble-ai/chatterbox) (TTS, cloned
   voice) — or anything that implements the two HTTP contracts in
-  `docs/speech-services.md`. Reference servers live in `examples/`.
+  `docs/speech-services.md`. A reference faster-whisper server is
+  `examples/stt-server.py`; the TTS side is any Chatterbox HTTP wrapper
+  exposing the `/tts` contract.
 - **Network.** Put your machines on [Tailscale](https://tailscale.com) first.
   Nothing you run should listen on the public internet — that's the security
   model, and it's the whole reason this is safe to run.
@@ -107,6 +109,10 @@ The full guide — parts list, setup steps, the three-endpoint contract:
 - **Transcript ticker.** Every utterance accepted as addressed to Jarvis is
   posted to the voice channel's text chat, so you can see you're heard.
   Disable with `JARVIS_TRANSCRIPT_FEED=false`.
+- **Reply mirror.** Every spoken reply is mirrored as text in the voice
+  channel's chat — the Discord record is complete: what you said, what
+  Jarvis said back. Text fallback already posts text, so it is never
+  duplicated.
 - **Typed input** (DMs, main channel, voice-channel chat) enters the same
   queue tagged `via: 'text'` and gets text replies via `/send-text`.
   Text in, text out — never voice playback for typed messages.
