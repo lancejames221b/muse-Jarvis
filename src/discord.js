@@ -29,8 +29,19 @@ export function createDiscord({ config }) {
 
   // Threads MUSE opened after an @muse summon: threadId -> parentChannelId.
   // Messages inside them are implicitly addressed, so the conversation flows
-  // without a mention on every line.
+  // without a mention on every line. The map is a fast path only — after a
+  // service restart it is empty, so isMuseSummonThread() also recognizes
+  // MUSE threads structurally (bot-owned, "MUSE chat" name).
   const botThreads = new Map();
+
+  /**
+   * Structural check for a MUSE summon thread: owned by the bot and named
+   * "MUSE chat ...". Survives service restarts, unlike the botThreads map.
+   */
+  function isMuseSummonThread(ch, botId) {
+    return !!botId && ch.ownerId === botId &&
+      typeof ch.name === 'string' && ch.name.startsWith('MUSE chat');
+  }
 
   /**
    * True when the message @-tags a role the bot itself holds. Lets a role
@@ -82,7 +93,8 @@ export function createDiscord({ config }) {
     // unless explicitly summoned with @muse, which opens a thread instead.
     if (!mentioned && config.silentTextChannels.includes(channel.id)) return;
     const isDM = !channel.guildId;
-    const inBotThread = channel.isThread?.() && botThreads.has(channel.id);
+    const inBotThread = channel.isThread?.() &&
+      (botThreads.has(channel.id) || isMuseSummonThread(channel, botId));
     // The owner's live voice-channel chat is implicitly addressed — it
     // follows him as he moves channels.
     let isVoiceChat = false;
