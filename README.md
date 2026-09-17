@@ -1,11 +1,15 @@
 # muse-Jarvis
 
-Talk to your own JARVIS in Discord. You speak, it answers out loud — in a
-cloned voice, right in the voice channel.
+We gave Muse a voice.
+
+Muse is Meta's personal AI agent — it already does your work, remembers your
+life, and keeps going after you close the app. This project adds ears and a
+mouth: a Discord voice interface, so you can talk to your Muse out loud and
+it talks back. That's the whole hack.
 
 The bot itself is deliberately dumb: it hears, transcribes, queues, and
-speaks. All the thinking happens in a separate **brain**: a persistent Muse
-agent session with tools, memory, and judgment. One mind, dumb edges.
+speaks. All the thinking is Muse — your persistent agent session, with tools,
+memory, and judgment. One mind, dumb edges.
 
 ## Play with it first
 
@@ -109,8 +113,8 @@ The full guide — parts list, setup steps, the three-endpoint contract:
 ## What it doesn't do
 
 No conversational model, no tools, no decisions. It never answers on its own —
-a separate worker drains the outbox and is the sole responder. If the bot ever
-seems smart, that's your brain, not the bot.
+your Muse drains the outbox and is the sole responder. If the bot ever seems
+smart, that's Muse, not the bot.
 
 ## Endpoints
 

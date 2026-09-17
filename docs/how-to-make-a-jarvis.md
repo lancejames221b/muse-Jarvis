@@ -1,9 +1,9 @@
 # How to make a Jarvis using Muse
 
-A voice assistant you talk to in Discord: you speak, it answers out loud.
-The bot itself is deliberately dumb — all the thinking happens in an agent
-(the same kind of Muse session that's writing this). An evening's work if
-you've got the parts.
+We gave Muse a voice. A voice assistant you talk to in Discord: you speak,
+your Muse answers out loud. The bot itself is deliberately dumb — all the
+thinking happens in your Muse agent session (the same kind of session that's
+writing this). An evening's work if you've got the parts.
 
 ## What you're building
 
