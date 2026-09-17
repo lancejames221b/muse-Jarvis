@@ -33,13 +33,28 @@ export function createDiscord({ config }) {
   const botThreads = new Map();
 
   /**
+   * True when the message @-tags a role the bot itself holds. Lets a role
+   * tag like @muse summon the bot the same way a direct user mention does.
+   */
+  async function isSummonedByRole(message, text) {
+    if (!/<@&\d+>/.test(text) || !message.guildId || !client.user) return false;
+    const guild = client.guilds.cache.get(config.guildId);
+    if (!guild) return false;
+    const me = guild.members.cache.get(client.user.id)
+      || await guild.members.fetch(client.user.id).catch(() => null);
+    if (!me) return false;
+    return [...message.mentions.roles.keys()].some((rid) => me.roles.cache.has(rid));
+  }
+
+  /**
    * Typed input from allowed users. Accepted in every text channel the bot
    * can see — DMs, guild channels, and threads, except channels listed in
    * MUSE_SILENT_CHANNELS (an explicit @muse summon still opens a thread
    * there). Addressing: DMs, the owner's live voice-channel chat, and
    * MUSE's own summon threads are implicitly addressed; everywhere else the
    * message must @-mention the bot (shared space) — the bare "jarvis" prefix
-   * no longer summons in guild channels.
+   * no longer summons in guild channels. Tagging a role the bot holds (e.g.
+   * @muse) summons it the same as a direct mention.
    * An @muse mention in a guild channel opens (or reuses) a thread and the
    * reply lands there, keeping the channel itself clean. Queued as
    * { via: 'text', channelId } so the reply lands in the exact originating
@@ -55,7 +70,14 @@ export function createDiscord({ config }) {
     const botId = client.user?.id;
     let text = message.content || '';
     const mentionRe = botId ? new RegExp(`<@!?${botId}>`) : null;
-    const mentioned = !!(mentionRe && mentionRe.test(text));
+    let mentioned = !!(mentionRe && mentionRe.test(text));
+    if (!mentioned) {
+      // A @role tag also summons the bot when it holds that role
+      // (e.g. tagging @muse the role instead of the bot user).
+      mentioned = await isSummonedByRole(message, text).catch(() => false);
+    }
+    // Strip all mention syntax (user + role) before queueing the text.
+    text = text.replace(/<@!?&?\d+>/g, ' ');
     // Per-channel silence list: MUSE never answers typed input here —
     // unless explicitly summoned with @muse, which opens a thread instead.
     if (!mentioned && config.silentTextChannels.includes(channel.id)) return;
@@ -72,10 +94,7 @@ export function createDiscord({ config }) {
       }
     }
     let addressed = isDM || isVoiceChat || inBotThread;
-    if (mentionRe && mentionRe.test(text)) {
-      addressed = true;
-      text = text.replace(mentionRe, ' ');
-    }
+    if (mentioned) addressed = true;
     // Note: the bare "jarvis" prefix does NOT address the bot in guild
     // channels — Hermes rules: in a chat channel you must @-mention the bot,
     // which opens a thread. (DMs and the voice-channel chat stay implicit.)
@@ -107,7 +126,7 @@ export function createDiscord({ config }) {
    */
   async function getOrOpenSummonThread(message) {
     const parentId = message.channel.id;
-    const clean = (message.content || '').replace(/<@!?\d+>/g, '').trim().slice(0, 40);
+    const clean = (message.content || '').replace(/<@!?&?\d+>/g, '').trim().slice(0, 40);
     const threadName = `MUSE chat${clean ? ' — ' + clean : ''}`.slice(0, 100);
 
     const useThread = async (t) => {
