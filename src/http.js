@@ -137,6 +137,17 @@ export function createHttp({ config, player, voiceConn, discord, stt, tts, route
         // Refresh the conversation window so follow-ups skip the wake word.
         const { openMuseConversationWindow } = await import('./voice/muse-window.js');
         openMuseConversationWindow(ownerId);
+        // Reply mirror: post the spoken reply as text in the voice channel's
+        // chat, so there's a readable record in Discord. The transcript
+        // ticker already posted the heard utterance; this is the other half.
+        // Fire-and-forget — a mirror failure must never fail a successful
+        // voice delivery. Text fallback already posts text, so it is
+        // deliberately not mirrored again here (no duplicates).
+        const channelId = voiceConn.getChannelId?.();
+        if (channelId) {
+          discord.sendTextToChannel(channelId, `🔊 "${message}"`).catch((err) =>
+            logger.warn(`http: reply mirror failed: ${err?.message || err}`));
+        }
         return json(res, 200, { ok: true, delivered: 'voice', userInVoice: true });
       }
       logger.warn('http: /speak TTS failed — text fallback');
