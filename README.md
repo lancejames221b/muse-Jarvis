@@ -43,6 +43,10 @@ an 80-line stdlib-only brain to start from.
 
 ## Endpoints (all Bearer `ALERT_WEBHOOK_TOKEN` except /health)
 
+`TEXT_ENABLED` (default true) gates typed input and `/send-text`.
+`POST /send-text` returns 409 while it is off. `/speak` keeps its
+text fallback when you are not in voice.
+
 - `GET /health` — liveness, outbox/player depth, STT/TTS health
 - `GET /voice-inbox?since=<id>&wait=<s>` — long-pollable outbox
 - `POST /speak {message}` — voice if the owner is in channel, else text fallback

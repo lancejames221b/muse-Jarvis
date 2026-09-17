@@ -151,6 +151,9 @@ export function createHttp({ config, player, voiceConn, discord, stt, tts, route
     }
     const message = body.message;
     const channelId = body.channelId;
+    if (!config.textEnabled) {
+      return json(res, 409, { error: 'text input disabled (TEXT_ENABLED=false)' });
+    }
     if (!message || !String(message).trim()) {
       return json(res, 400, { error: 'message required' });
     }

@@ -1,9 +1,8 @@
 /**
- * discord.js — Discord client: login, thread-silence guard, text fallback,
- * owner server-mute. No conversational handling of typed messages — the bot
- * is voice-only; in threads it stays completely silent.
+ * discord.js — Discord client: login, thread-silence guard, typed input,
+ * text fallback, owner server-mute. In threads it stays completely silent.
  */
-import { Client, GatewayIntentBits } from 'discord.js';
+import { Client, GatewayIntentBits, Partials } from 'discord.js';
 import logger from './logger.js';
 import { pushTextItem } from './voice/outbox.js';
 
@@ -13,7 +12,13 @@ export function createDiscord({ config }) {
       GatewayIntentBits.Guilds,
       GatewayIntentBits.GuildMessages,
       GatewayIntentBits.GuildVoiceStates,
+      // Typed input needs these. MessageContent is privileged — enable it in
+      // the Discord developer portal (Bot -> Privileged Gateway Intents),
+      // or message.content arrives empty and typed input silently never queues.
+      GatewayIntentBits.MessageContent,
+      GatewayIntentBits.DirectMessages,
     ],
+    partials: [Partials.Channel], // DM channels arrive as partials
   });
 
   // Voice-only in threads: stay silent (ported from the old bot).
@@ -23,28 +28,34 @@ export function createDiscord({ config }) {
   });
 
   /**
-   * Typed input from the owner. Accepted in: bot DMs, the main text channel
-   * (#general), and the owner's live voice channel chat. Elsewhere — silent.
-   * Addressed when it @-mentions the bot or leads with "jarvis"
-   * (DMs are always addressed). Queued as { via: 'text', channelId }.
+   * Typed input from the owner. Accepted in: bot DMs, the main text channel,
+   * and the owner's live voice channel chat. Elsewhere — silent. DMs and the
+   * voice channel's chat are always addressed; in the main channel the
+   * message must @-mention the bot or lead with "jarvis" (shared space).
+   * Queued as { via: 'text', channelId }. Gated by TEXT_ENABLED.
    */
   async function handleTextInput(message) {
+    if (!config.textEnabled) return;
     if (!message || message.author?.bot) return;
     if (!config.allowedUsers.includes(message.author.id)) return;
     const channel = message.channel;
     if (!channel) return;
     const isDM = !channel.guildId;
     let accepted = isDM;
+    let isVoiceChat = false;
     if (!accepted && config.textChannelId && channel.id === config.textChannelId) accepted = true;
     if (!accepted) {
       const guild = client.guilds.cache.get(config.guildId);
       const member = guild?.members.cache.get(config.allowedUsers[0]);
-      if (member?.voice?.channelId && channel.id === member.voice.channelId) accepted = true;
+      if (member?.voice?.channelId && channel.id === member.voice.channelId) {
+        accepted = true;
+        isVoiceChat = true;
+      }
     }
     if (!accepted) return;
     const botId = client.user?.id;
     let text = message.content || '';
-    let addressed = isDM;
+    let addressed = isDM || isVoiceChat;
     if (!addressed && botId) {
       const mentionRe = new RegExp(`<@!?${botId}>`);
       if (mentionRe.test(text)) {

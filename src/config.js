@@ -53,6 +53,7 @@ export function loadConfig() {
     chatterboxVoice: (process.env.CHATTERBOX_VOICE || 'jarvis').trim(),
     listenWindowMs: _num('JARVIS_LISTEN_WINDOW_MS', 30000),
     conversationModeEnabled: _bool('JARVIS_CONVERSATION_MODE_ENABLED', true),
+    textEnabled: _bool('TEXT_ENABLED', true),
     borderlineConfidence: _num('BORDERLINE_CONFIDENCE', 0.55),
     vadTimeoutMs: _num('VAD_TIMEOUT', 1500),
     utteranceDebounceMs: _num('UTTERANCE_DEBOUNCE_MS', 0),

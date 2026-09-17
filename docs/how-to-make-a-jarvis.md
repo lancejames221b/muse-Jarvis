@@ -40,8 +40,10 @@ network.
 
 **2. Discord token.** In the developer portal: new application → Bot →
 copy token → OAuth2 URL generator → scopes `bot` (+ `applications.commands`
-if you want them) → open the URL, add it to your server. Also enable the
-`MESSAGE CONTENT` intent if you want typed chat.
+if you want them) → open the URL, add it to your server. Then under
+Bot → Privileged Gateway Intents, enable **Message Content Intent** —
+without it, typed messages arrive with empty content and text input
+silently does nothing.
 
 **3. Clone and configure.**
 
@@ -94,7 +96,9 @@ changes: poll the queue, answer through `/speak`.
 
 **6. Talk.** Join the voice channel, say "Jarvis" — it answers. Say it once,
 then just keep talking for ~30 seconds (the follow-up window). Say "that's
-all" or "thanks" to close it. Or just type to it in a DM or channel.
+all" or "thanks" to close it. Or type to it: DMs and the voice
+channel's chat need no prefix; in the main channel @-mention the bot
+or lead with "jarvis". (Set `TEXT_ENABLED=false` to run voice-only.)
 
 ## How it works, in 30 seconds
 
