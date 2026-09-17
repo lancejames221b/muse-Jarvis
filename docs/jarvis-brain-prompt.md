@@ -83,3 +83,5 @@ The prompt is deliberately minimal — persona, tools, and integrations are
 yours to add. The non-negotiable parts are the loop (one poller, cursor
 discipline), the silence default, and the voice/text routing. Change the
 voice; don't change the contract.
+
+The persona this project was built around lives in [identity.md](./identity.md) — the register, the "sir", the dry wit. Adopt it, adapt it, or write your own. The contract doesn't care.
