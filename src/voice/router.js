@@ -16,12 +16,25 @@ import {
   isMuseConversationWindowOpen,
   isMuseConversationClosePhrase,
   isNonSpeechVocalization,
+  onMuseWindowClose,
 } from './muse-window.js';
 import logger from '../logger.js';
 
 const WAKE_RE = /^(hey[^a-z0-9]*)?jarvis\b[^a-z0-9]*/i;
 
 export function createRouter({ outbox, player, allowedUsers, conversationModeEnabled, onHeard, getVoiceChannelId }) {
+  // Wake-window tones (JARVIS_WINDOW_TONES_ENABLED=false to disable): a soft
+  // blip when the window opens (fresh wake only, not follow-up refreshes) and
+  // when it closes, so "it ignored me" vs "it didn't hear me" is never
+  // ambiguous. Serialized through the player FIFO — a tone can never cut off
+  // or talk over speech. Fire-and-forget; routing must never break because a
+  // tone failed.
+  const tonesEnabled = process.env.JARVIS_WINDOW_TONES_ENABLED !== 'false';
+  function tone(kind) {
+    if (!tonesEnabled) return;
+    try { player.playTone(kind)?.catch?.(() => {}); } catch {}
+  }
+  onMuseWindowClose(() => tone('close'));
   // Voice-channel chat id for 'send it to the chat' requests: resolved lazily
   // at push time so reconnects and channel moves are picked up.
   const voiceChannelOpts = () => {
@@ -37,8 +50,8 @@ export function createRouter({ outbox, player, allowedUsers, conversationModeEna
     if (m) {
       const cmd = t.slice(m[0].length).trim();
       if (isMuseConversationClosePhrase(cmd)) {
-        closeMuseConversationWindow(userId);
         player.cancel();
+        closeMuseConversationWindow(userId);
         logger.info(`router: window closed by close phrase "${cmd.substring(0, 40)}"`);
         return;
       }
@@ -47,7 +60,11 @@ export function createRouter({ outbox, player, allowedUsers, conversationModeEna
         logger.info(`router: non-speech after wake ignored "${cmd.substring(0, 40)}"`);
         return;
       }
-      if (conversationModeEnabled) openMuseConversationWindow(userId);
+      if (conversationModeEnabled) {
+        // Fresh open only: re-saying "jarvis" mid-window refreshes silently.
+        if (!isMuseConversationWindowOpen(userId)) tone('open');
+        openMuseConversationWindow(userId);
+      }
       if (cmd) {
         const item = outbox.pushVoiceItem(cmd, voiceChannelOpts());
         if (item) {
@@ -63,8 +80,8 @@ export function createRouter({ outbox, player, allowedUsers, conversationModeEna
 
     if (conversationModeEnabled && isMuseConversationWindowOpen(userId)) {
       if (isMuseConversationClosePhrase(t)) {
-        closeMuseConversationWindow(userId);
         player.cancel();
+        closeMuseConversationWindow(userId);
         logger.info(`router: window closed by close phrase "${t.substring(0, 40)}"`);
         return;
       }

@@ -34,40 +34,98 @@ export function museConversationWindowMs() {
 // simply closes any open window (fail-safe — worst case the user re-says "Jarvis").
 const _museWindows = new Map();
 
-// Prune expired entries periodically to prevent unbounded growth.
+// Close listeners: notified (userId, reason) whenever a window actually
+// closes — reason 'explicit' (close phrase) or 'expired' (silence timeout,
+// fired by the per-window scheduled timer at the moment the window ends;
+// the lazy check and the prune sweep below remain as backstops). Lets the
+// voice layer play a soft close tone so silence is never ambiguous.
+// Fire-and-forget; a throwing listener must never break window bookkeeping.
+const _closeListeners = new Set();
+export function onMuseWindowClose(fn) {
+  if (typeof fn === 'function') _closeListeners.add(fn);
+  return () => _closeListeners.delete(fn);
+}
+function _emitMuseWindowClose(userId, reason) {
+  for (const fn of [..._closeListeners]) {
+    try { fn(userId, reason); } catch (e) { logger.warn(`muse-window: close listener threw: ${e?.message}`); }
+  }
+}
+
+// Per-window expiry timers (userId -> setTimeout handle). The window used to
+// expire lazily — the close tone only fired when something happened to ask
+// whether the window was still open, or up to 60s late via the prune sweep.
+// Now every open/refresh schedules its own timer, so the 'expired' close
+// tone plays within milliseconds of the window actually ending.
+const _museWindowTimers = new Map();
+function _clearMuseWindowTimer(userId) {
+  const t = _museWindowTimers.get(userId);
+  if (t !== undefined) {
+    clearTimeout(t);
+    _museWindowTimers.delete(userId);
+  }
+}
+function _expireMuseWindow(userId, expectedExpiry) {
+  _museWindowTimers.delete(userId);
+  const exp = _museWindows.get(userId);
+  // Guard: a refresh or explicit close between scheduling and firing must
+  // not emit a stale 'expired'. (Refresh always clears the old timer first,
+  // so this is defense-in-depth.)
+  if (exp === undefined || exp !== expectedExpiry) return;
+  _museWindows.delete(userId);
+  logger.info('👂 Muse conversation window expired (scheduled)');
+  _emitMuseWindowClose(userId, 'expired');
+}
+
+// Prune expired entries periodically as a backstop (e.g. a timer lost to an
+// unexpected throw). With per-window scheduling this should find nothing.
 setInterval(() => {
   const now = Date.now();
   for (const [userId, exp] of _museWindows) {
-    if (now >= exp) _museWindows.delete(userId);
+    if (now >= exp) {
+      _clearMuseWindowTimer(userId);
+      _museWindows.delete(userId);
+      _emitMuseWindowClose(userId, 'expired');
+    }
   }
 }, 60 * 1000).unref?.();
 
 /**
  * Open (or refresh) the follow-up window for a user, starting now.
  * Called on every wake-matched utterance — even a bare "Jarvis" whose empty
- * remainder is not pushed to the outbox.
+ * remainder is not pushed to the outbox. Schedules a per-window timer so
+ * expiry (and the close tone) happens on time even in total silence.
  */
 export function openMuseConversationWindow(userId) {
   if (!userId) return;
-  _museWindows.set(userId, Date.now() + museConversationWindowMs());
-  logger.info(`👂 Muse conversation window opened (${Math.round(museConversationWindowMs() / 1000)}s)`);
+  _clearMuseWindowTimer(userId);
+  const windowMs = museConversationWindowMs();
+  const exp = Date.now() + windowMs;
+  _museWindows.set(userId, exp);
+  const handle = setTimeout(() => _expireMuseWindow(userId, exp), windowMs);
+  handle.unref?.();
+  _museWindowTimers.set(userId, handle);
+  logger.info(`👂 Muse conversation window opened (${Math.round(windowMs / 1000)}s)`);
 }
 
 /** Force-close the follow-up window for a user. Returns true if one was open. */
 export function closeMuseConversationWindow(userId) {
   if (userId && _museWindows.delete(userId)) {
+    _clearMuseWindowTimer(userId);
     logger.info('🛑 Muse conversation window closed');
+    _emitMuseWindowClose(userId, 'explicit');
     return true;
   }
   return false;
 }
 
-/** Is the follow-up window currently open for this user? (lazy expiry) */
+/** Is the follow-up window currently open for this user? (lazy expiry backstop) */
 export function isMuseConversationWindowOpen(userId) {
   const exp = _museWindows.get(userId);
   if (!exp) return false;
   if (Date.now() >= exp) {
+    _clearMuseWindowTimer(userId);
     _museWindows.delete(userId);
+    _emitMuseWindowClose(userId, 'expired');
     return false;
   }
   return true;
