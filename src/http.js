@@ -3,9 +3,10 @@
  *
  *   GET  /voice-inbox?since=<id>&wait=<secs>  long-poll, unchanged semantics
  *   POST /voice-inbox/test                    test hook (synthetic item)
- *   POST /speak {message}                     Bearer; exact-hash dedup (60s);
+ *   POST /speak {message, allow_text_post?}   Bearer; exact-hash dedup (60s);
  *                                             200ms in-flight mutex; voice or
- *                                             text fallback
+ *                                             text fallback (skipped entirely
+ *                                             when allow_text_post === false)
  *   POST /send-text {channelId, message}      Bearer; text reply into a channel;
  *                                             409 when TEXT_ENABLED=false
  *   GET  /health                               {ok, voice, outboxDepth, stt, tts}
@@ -117,6 +118,10 @@ export function createHttp({ config, player, voiceConn, discord, stt, tts, route
     if (!message || !String(message).trim()) {
       return json(res, 400, { error: 'message required' });
     }
+    // "discord posts off" (2026-09-17): when false, speak in the voice
+    // channel if the owner is there, but never post text to Discord —
+    // no text fallback and no reply mirror.
+    const allowTextPost = body.allow_text_post !== false;
 
     if (isInFlight(message)) {
       logger.info(`http: /speak in-flight dedup skip "${String(message).substring(0, 40)}"`);
@@ -144,7 +149,7 @@ export function createHttp({ config, player, voiceConn, discord, stt, tts, route
         // voice delivery. Text fallback already posts text, so it is
         // deliberately not mirrored again here (no duplicates).
         const channelId = voiceConn.getChannelId?.();
-        if (channelId) {
+        if (allowTextPost && channelId) {
           discord.sendTextToChannel(channelId, `🔊 "${message}"`).catch((err) =>
             logger.warn(`http: reply mirror failed: ${err?.message || err}`));
         }
@@ -153,6 +158,10 @@ export function createHttp({ config, player, voiceConn, discord, stt, tts, route
       logger.warn('http: /speak TTS failed — text fallback');
     } else {
       logger.info('http: /speak owner not in voice — text fallback');
+    }
+    if (!allowTextPost) {
+      logger.info('http: /speak text post suppressed (allow_text_post=false)');
+      return json(res, 200, { ok: true, delivered: 'suppressed', userInVoice });
     }
     await discord.postTextFallback(String(message));
     return json(res, 200, { ok: true, delivered: 'text-fallback', userInVoice });
